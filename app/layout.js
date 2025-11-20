@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import Header from "@/components/header";
 import { ClerkProvider } from "@clerk/nextjs";
+import { dark, neobrutalism, shadesOfPurple } from '@clerk/themes'
 
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
@@ -24,7 +25,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <ClerkProvider appearance={{
-      baseTheme:"dark",
+      baseTheme:shadesOfPurple,
     }}>
       <html lang="en" suppressHydrationWarning>
         <body
@@ -38,7 +39,7 @@ export default function RootLayout({ children }) {
           >
             {/* Header */}
             <Header />
-            <main className="min-h-screen">{children}</main>
+            <main className="min-h-screen pt-16">{children}</main>
 
             {/* Footer */}
             <footer className="bg-muted/50 py-12">
