@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart AI Traffic Enforcement System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Tailwind CDN (for quick dev – later you can self-host for offline use) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Custom Tailwind config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', "system-ui", "sans-serif"],
+          },
+          colors: {
+            darkbg: "#05070A",
+            neonBlue: "#00E1FF",
+            neonPurple: "#AE00FF",
+            neonRed: "#FF004D",
+            neonGreen: "#14FF00",
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- GSAP + ScrollTrigger -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha512-EF7xN1+R2U2V5nIoJYdJXupv5asRZE8J/AcJf6tL1R1N5rkpLMeYp3p9b57S2zQ85b+B2n2uqI1HQlfnERc0xQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" integrity="sha512-5zFQazWcOD+8p4Ww42uJtTCso8D5T+Q4njWQpYJi4LUE802qi2n9qpcukkH+ngpBWgn0NdGJRWylM32mPGnZ0A==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <!-- Three.js -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
+  <!-- Optional: Tilt.js for card hover 3D effect -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.1/vanilla-tilt.min.js" integrity="sha512-jgij8h9qACAkpjG/E1fcWwBzG0hesq8xRu2yTRBz0ZfZo1oZm627bA+ZXiI3D4Rz7+Bx1qwXdwpfm9vBB5Q3uA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <style>
+    :root {
+      --bg-dark: #05070A;
+      --neon-blue: #00E1FF;
+      --neon-purple: #AE00FF;
+      --neon-red: #FF004D;
+      --neon-green: #14FF00;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #111827 0, #02040a 55%, #000000 100%);
+      color: #ECECEC;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #020617;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(var(--neon-blue), var(--neon-purple));
+      border-radius: 999px;
+    }
+
+    /* Neon border & glow */
+    .neon-card {
+      border: 1px solid rgba(0, 225, 255, 0.3);
+      background: radial-gradient(circle at top left, rgba(174, 0, 255, 0.15), rgba(5, 7, 10, 0.96));
+      box-shadow:
+        0 0 20px rgba(0, 225, 255, 0.3),
+        0 0 40px rgba(174, 0, 255, 0.25),
+        inset 0 0 8px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(18px);
+    }
+
+    /* Hologram / glass panel */
+    .glass-panel {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.3));
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      box-shadow: 0 0 40px rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(18px);
+    }
+
+    /* Glitch text effect light */
+    .glitch-text {
+      position: relative;
+      display: inline-block;
+    }
+    .glitch-text::before,
+    .glitch-text::after {
+      content: attr(data-text);
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0.7;
+      clip-path: polygon(0 0, 100% 0, 100% 45%, 0 53%);
+    }
+    .glitch-text::before {
+      color: var(--neon-blue);
+      transform: translate(-2px, -1px);
+      mix-blend-mode: screen;
+    }
+    .glitch-text::after {
+      color: var(--neon-purple);
+      transform: translate(2px, 1px);
+      mix-blend-mode: screen;
+    }
+
+    /* Hero canvas covers full section */
+    #hero-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0;
+    }
+
+    /* Subtle scanline overlay */
+    .scanlines::before {
+      content: "";
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0.18),
+        rgba(0, 0, 0, 0.18) 1px,
+        transparent 2px,
+        transparent 3px
+      );
+      mix-blend-mode: soft-light;
+      opacity: 0.4;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    /* Cursor glow */
+    .cursor-glow {
+      position: fixed;
+      width: 260px;
+      height: 260px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(0, 225, 255, 0.22), transparent 65%);
+      mix-blend-mode: screen;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+    }
+
+    /* Sections */
+    section.section {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Buttons */
+    .btn-neon {
+      position: relative;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      padding: 0.7rem 1.6rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+    }
+    .btn-neon::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      background: linear-gradient(120deg, var(--neon-blue), var(--neon-purple), var(--neon-red));
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: -1;
+    }
+    .btn-neon:hover::before {
+      opacity: 1;
+    }
+
+    .btn-neon span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .btn-outline-neon {
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      border-radius: 999px;
+      padding: 0.7rem 1.4rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+    }
+    .btn-outline-neon:hover {
+      border-color: var(--neon-blue);
+      box-shadow: 0 0 18px rgba(0, 225, 255, 0.4);
+    }
+
+    /* Video frame */
+    .holo-frame {
+      position: relative;
+      border-radius: 1.5rem;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      box-shadow:
+        0 0 45px rgba(0, 225, 255, 0.4),
+        0 0 90px rgba(174, 0, 255, 0.4);
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.7));
+    }
+    .holo-frame::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg,
+        rgba(0, 225, 255, 0.22),
+        transparent,
+        rgba(174, 0, 255, 0.2));
+      mix-blend-mode: color-dodge;
+      pointer-events: none;
+    }
+
+  </style>
+</head>
+<body class="font-sans text-slate-100 scanlines">
+
+  <!-- cursor glow -->
+  <div id="cursor-glow" class="cursor-glow"></div>
+
+  <!-- NAVBAR -->
+  <header class="fixed top-0 inset-x-0 z-30 bg-gradient-to-b from-black/70 via-black/30 to-transparent border-b border-slate-800/80 backdrop-blur-xl">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-neonBlue to-neonPurple flex items-center justify-center shadow-lg shadow-cyan-500/50">
+          <span class="text-xs font-extrabold tracking-widest">AI</span>
+        </div>
+        <div class="leading-tight">
+          <div class="text-xs uppercase tracking-[0.25em] text-slate-400">Smart Traffic</div>
+          <div class="text-sm font-semibold">AI Enforcement System</div>
+        </div>
+      </div>
+
+      <nav class="hidden md:flex items-center gap-6 text-[0.75rem] tracking-[0.2em] uppercase text-slate-300">
+        <a href="#hero" class="hover:text-neonBlue">Home</a>
+        <a href="#problem" class="hover:text-neonBlue">Problem</a>
+        <a href="#solution" class="hover:text-neonBlue">Solution</a>
+        <a href="#architecture" class="hover:text-neonBlue">Architecture</a>
+        <a href="#demo" class="hover:text-neonBlue">Demo</a>
+        <a href="#results" class="hover:text-neonBlue">Results</a>
+        <a href="#team" class="hover:text-neonBlue">Team</a>
+      </nav>
+
+      <button class="hidden md:inline-flex btn-neon text-[0.7rem]">
+        <span>Download Report</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section id="hero" class="section relative min-h-screen flex items-center justify-center pt-16">
+    <canvas id="hero-canvas"></canvas>
+
+    <!-- gradient overlay -->
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.22),transparent_55%),radial-gradient(circle_at_bottom,_rgba(236,72,153,0.18),transparent_55%)] mix-blend-screen opacity-80"></div>
+
+    <div class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-32 grid lg:grid-cols-[1.2fr,1fr] gap-12 items-center">
+      <!-- Text -->
+      <div class="space-y-6">
+        <p class="text-xs tracking-[0.35em] uppercase text-slate-400">
+          Real-Time • YOLO • Deep Learning • Enforcement
+        </p>
+
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
+          <span
+            class="glitch-text block text-transparent bg-clip-text bg-gradient-to-r from-neonBlue via-neonPurple to-neonRed"
+            data-text="Smart AI-Powered Traffic Violation Monitoring"
+          >
+            Smart AI-Powered Traffic Violation Monitoring
+          </span>
+          <span class="block mt-3 text-slate-200">
+            & Real-Time Enforcement System
+          </span>
+        </h1>
+
+        <p class="text-sm sm:text-base text-slate-300 max-w-xl">
+          An end-to-end AI system that <span class="text-neonBlue font-semibold">detects wrong-lane driving</span>,
+          <span class="text-neonBlue font-semibold">helmet violations</span>, and <span class="text-neonBlue font-semibold">red-light jumps</span>
+          using YOLO-based object detection — with automated evidence capture and alert generation.
+        </p>
+
+        <div class="flex flex-wrap gap-4 pt-2">
+          <button class="btn-neon bg-black/60">
+            <span>Watch Live Demo</span>
+          </button>
+          <button class="btn-outline-neon bg-black/40">
+            Project Pipeline
+          </button>
+        </div>
+
+        <!-- Hero stats -->
+        <div class="mt-8 grid grid-cols-3 gap-5 max-w-md text-xs uppercase tracking-[0.18em]">
+          <div class="neon-card rounded-2xl px-3 py-3">
+            <div class="text-[0.65rem] text-slate-400">Detection Accuracy</div>
+            <div class="text-lg font-bold text-neonGreen" data-counter data-target="96">0%</div>
+          </div>
+          <div class="neon-card rounded-2xl px-3 py-3">
+            <div class="text-[0.65rem] text-slate-400">Real-Time FPS</div>
+            <div class="text-lg font-bold text-neonBlue" data-counter data-target="28">0</div>
+          </div>
+          <div class="neon-card rounded-2xl px-3 py-3">
+            <div class="text-[0.65rem] text-slate-400">Tracked Lanes</div>
+            <div class="text-lg font-bold text-neonPurple" data-counter data-target="4">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right side: small hologram panel -->
+      <div class="neon-card rounded-3xl p-[1px] relative">
+        <div class="rounded-3xl glass-panel p-6 sm:p-7 flex flex-col gap-5">
+          <div class="flex items-center justify-between text-xs uppercase tracking-[0.25em] text-slate-400">
+            <span>Live Junction Feed</span>
+            <span class="flex items-center gap-1 text-neonGreen">
+              ● <span class="text-[0.6rem]">Online</span>
+            </span>
+          </div>
+
+          <div class="holo-frame aspect-video">
+            <!-- Replace with your own video in /assets  -->
+            <video
+              src="assets/demo1.mp4"
+              class="w-full h-full object-cover"
+              autoplay
+              muted
+              loop
+              playsinline
+            ></video>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="bg-slate-900/60 rounded-2xl px-3 py-3 border border-slate-700/70">
+              <div class="text-[0.6rem] text-slate-400">Current Violations</div>
+              <div class="mt-1 font-semibold text-neonRed">Wrong Lane, Helmet</div>
+            </div>
+            <div class="bg-slate-900/60 rounded-2xl px-3 py-3 border border-slate-700/70">
+              <div class="text-[0.6rem] text-slate-400">Auto Actions</div>
+              <div class="mt-1 font-semibold text-neonBlue">Frame Capture, E-mail Alert</div>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-[0.7rem] text-slate-400 pt-1">
+            <span>Powered by YOLO + Deep Learning</span>
+            <span class="text-[0.6rem] bg-slate-900/70 border border-slate-700/60 rounded-full px-2 py-1">
+              Demo Build v1.0
+            </span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLEM SECTION -->
+  <section id="problem" class="section py-20 md:py-28">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[1.1fr,1fr] gap-10 items-center">
+      <div>
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">00 — Problem</p>
+        <h2 class="text-2xl md:text-3xl font-bold mb-5">
+          Uncontrolled violations make Indian intersections chaotic and unsafe.
+        </h2>
+        <p class="text-sm md:text-[0.95rem] text-slate-300 mb-6 max-w-xl">
+          Manual policing at dense junctions is <span class="text-neonRed font-semibold">slow, biased and hard to scale</span>.
+          CCTV footage often remains a passive recording tool instead of becoming an active enforcement system.
+        </p>
+
+        <div class="grid sm:grid-cols-3 gap-4 text-xs">
+          <div class="neon-card rounded-2xl px-3 py-3">
+            <div class="text-slate-400 text-[0.65rem]">High Violation Density</div>
+            <div class="mt-1 font-semibold">Wrong-lane & Helmet</div>
+          </div>
+          <div class="neon-card rounded-2xl px-3 py-3">
+            <div class="text-slate-400 text-[0.65rem]">Human Monitoring</div>
+            <div class="mt-1 font-semibold">Error-prone & Fatiguing</div>
+          </div>
+          <div class="neon-card rounded-2xl px-3 py-3">
+            <div class="text-slate-400 text-[0.65rem]">Delayed Enforcement</div>
+            <div class="mt-1 font-semibold">Evidence & E-challan lag</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="relative">
+        <div class="absolute -inset-8 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),transparent_60%)] blur-3xl opacity-60"></div>
+
+        <div class="relative neon-card rounded-3xl p-[1px]">
+          <div class="rounded-3xl glass-panel p-5 sm:p-6">
+            <div class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-4">
+              Junction Chaos Snapshot
+            </div>
+            <ul class="space-y-3 text-[0.85rem] text-slate-300">
+              <li class="flex gap-2">
+                <span class="mt-1 h-[3px] w-6 rounded-full bg-gradient-to-r from-neonRed to-neonPurple"></span>
+                <span>Multiple bikes share the wrong lane to skip signal waiting time.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="mt-1 h-[3px] w-6 rounded-full bg-gradient-to-r from-neonPurple to-neonBlue"></span>
+                <span>Majority of riders skip helmets on short-distance trips.</span>
+              </li>
+              <li class="flex gap-2">
+                <span class="mt-1 h-[3px] w-6 rounded-full bg-gradient-to-r from-neonBlue to-neonGreen"></span>
+                <span>CCTV cameras exist but lack an intelligence layer to act on violations in real time.</span>
+              </li>
+            </ul>
+
+            <div class="mt-6 text-xs bg-slate-950/70 border border-slate-700/70 rounded-2xl px-3 py-3 flex items-center justify-between">
+              <span class="text-slate-400">Objective</span>
+              <span class="font-semibold text-neonBlue text-[0.7rem]">Turn passive cameras into active AI enforcers.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOLUTION SECTION -->
+  <section id="solution" class="section py-20 md:py-28">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-10">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">01 — Solution</p>
+          <h2 class="text-2xl md:text-3xl font-bold mb-3">
+            AI that sees, understands, and acts on traffic violations.
+          </h2>
+          <p class="text-sm md:text-[0.95rem] text-slate-300 max-w-2xl">
+            We integrate <span class="text-neonBlue font-semibold">YOLO-based object detection</span> with a smart violation engine that
+            understands lane rules, helmets, and signal timing to trigger automated alerts and evidence recording.
+          </p>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-4 gap-4 md:gap-5">
+        <div class="neon-card rounded-2xl p-4 text-xs" data-tilt data-tilt-max="8" data-tilt-speed="400">
+          <div class="text-[0.7rem] text-slate-400 mb-1">Stage 01</div>
+          <div class="font-semibold mb-1">Video Ingestion</div>
+          <p class="text-slate-300 text-[0.8rem]">
+            Live CCTV or uploaded junction footage is fed to the system using a web interface.
+          </p>
+        </div>
+        <div class="neon-card rounded-2xl p-4 text-xs" data-tilt data-tilt-max="8" data-tilt-speed="400">
+          <div class="text-[0.7rem] text-slate-400 mb-1">Stage 02</div>
+          <div class="font-semibold mb-1">YOLO Detection</div>
+          <p class="text-slate-300 text-[0.8rem]">
+            Vehicles, lanes, and helmets are detected frame-by-frame using an optimized YOLO model.
+          </p>
+        </div>
+        <div class="neon-card rounded-2xl p-4 text-xs" data-tilt data-tilt-max="8" data-tilt-speed="400">
+          <div class="text-[0.7rem] text-slate-400 mb-1">Stage 03</div>
+          <div class="font-semibold mb-1">Rule Engine</div>
+          <p class="text-slate-300 text-[0.8rem]">
+            Logical rules verify if vehicles are in wrong lanes, skipping helmets, or breaking signal states.
+          </p>
+        </div>
+        <div class="neon-card rounded-2xl p-4 text-xs" data-tilt data-tilt-max="8" data-tilt-speed="400">
+          <div class="text-[0.7rem] text-slate-400 mb-1">Stage 04</div>
+          <div class="font-semibold mb-1">Violation Actions</div>
+          <p class="text-slate-300 text-[0.8rem]">
+            Violations trigger frame capture, metadata logging, and optional e-mail dispatch to authorities.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture" class="section py-20 md:py-28">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-[1.1fr,1fr] gap-10 items-center">
+      <div>
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">02 — System Architecture</p>
+        <h2 class="text-2xl md:text-3xl font-bold mb-4">
+          Fully modular, from camera stream to violation report.
+        </h2>
+        <p class="text-sm md:text-[0.95rem] text-slate-300 mb-5">
+          The architecture is designed to be plug-and-play with existing CCTV setups, supporting both
+          <span class="text-neonBlue font-semibold">live RTSP feeds</span> and <span class="text-neonBlue font-semibold">offline recorded videos</span>.
+        </p>
+
+        <ul class="space-y-3 text-[0.85rem] text-slate-300">
+          <li>• Ingestion Layer: Video capture & basic pre-processing.</li>
+          <li>• AI Layer: YOLO detection, lane mapping, helmet classification.</li>
+          <li>• Intelligence Layer: Violation logic, event tracking.</li>
+          <li>• Reporting Layer: Snapshot capture, JSON logs, optional mail integration.</li>
+        </ul>
+      </div>
+
+      <div class="relative">
+        <div class="absolute -inset-8 bg-[radial-gradient(circle_at_center,_rgba(56,189,248,0.3),transparent_60%)] blur-3xl opacity-70"></div>
+        <div class="relative neon-card rounded-3xl p-[1px]">
+          <div class="rounded-3xl glass-panel p-5 sm:p-6 flex flex-col gap-4">
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span>Architecture Blueprint</span>
+              <span class="text-[0.65rem] px-2 py-1 bg-slate-900/70 rounded-full border border-slate-700/80">
+                /assets/architecture.png
+              </span>
+            </div>
+            <!-- Replace src with your architecture image -->
+            <div class="rounded-2xl border border-slate-700/80 overflow-hidden bg-slate-900/70 aspect-[4/3] flex items-center justify-center text-[0.75rem] text-slate-500">
+              <span>Architecture Diagram Placeholder</span>
+            </div>
+            <p class="text-[0.8rem] text-slate-300">
+              This block shows how video frames move through the AI pipeline, with each major stage highlighted for presentation.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEMO VIDEO & VIOLATIONS -->
+  <section id="demo" class="section py-20 md:py-28">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[1.2fr,0.9fr] gap-10 items-center">
+      <div>
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">03 — Live Demo</p>
+        <h2 class="text-2xl md:text-3xl font-bold mb-4">
+          Real-time detection of wrong-lane, helmet-less & signal jump violations.
+        </h2>
+        <p class="text-sm md:text-[0.95rem] text-slate-300 mb-5">
+          The web interface allows you to upload a traffic video or connect to a CCTV stream. Detected vehicles are
+          surrounded by neon <span class="text-neonBlue font-semibold">bounding boxes</span>, violations are flagged in
+          <span class="text-neonRed font-semibold">red overlays</span>, and logs are updated in real time.
+        </p>
+
+        <div class="holo-frame mb-4">
+          <!-- Replace with actual video -->
+          <video
+            src="assets/demo2.mp4"
+            class="w-full h-full object-cover"
+            autoplay
+            muted
+            loop
+            playsinline
+          ></video>
+        </div>
+
+        <div class="text-[0.8rem] text-slate-300 flex flex-wrap gap-3">
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/80">
+            <span class="w-2 h-2 rounded-full bg-neonRed"></span>
+            Wrong-lane marker
+          </span>
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/80">
+            <span class="w-2 h-2 rounded-full bg-neonBlue"></span>
+            Helmet detection
+          </span>
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-900/80 border border-slate-700/80">
+            <span class="w-2 h-2 rounded-full bg-neonPurple"></span>
+            Signal jump checker
+          </span>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-400">04 — Violation Types</p>
+        <div class="grid gap-4 text-xs">
+          <div class="neon-card rounded-2xl p-4" data-tilt data-tilt-max="8" data-tilt-speed="400">
+            <div class="flex items-center justify-between">
+              <div class="font-semibold">Wrong-Lane Driving</div>
+              <span class="text-[0.6rem] bg-neonRed/20 text-neonRed px-2 py-1 rounded-full border border-neonRed/40">High Risk</span>
+            </div>
+            <p class="mt-1 text-slate-300 text-[0.8rem]">
+              Vehicles detected outside their designated lane boundaries are highlighted and logged.
+            </p>
+          </div>
+
+          <div class="neon-card rounded-2xl p-4" data-tilt data-tilt-max="8" data-tilt-speed="400">
+            <div class="flex items-center justify-between">
+              <div class="font-semibold">Helmet-less Riders</div>
+              <span class="text-[0.6rem] bg-neonPurple/20 text-neonPurple px-2 py-1 rounded-full border border-neonPurple/40">Medium Risk</span>
+            </div>
+            <p class="mt-1 text-slate-300 text-[0.8rem]">
+              Helmet presence over detected riders is checked to flag non-compliance.
+            </p>
+          </div>
+
+          <div class="neon-card rounded-2xl p-4" data-tilt data-tilt-max="8" data-tilt-speed="400">
+            <div class="flex items-center justify-between">
+              <div class="font-semibold">Signal Violations</div>
+              <span class="text-[0.6rem] bg-neonBlue/20 text-neonBlue px-2 py-1 rounded-full border border-neonBlue/40">Configurable</span>
+            </div>
+            <p class="mt-1 text-slate-300 text-[0.8rem]">
+              Vehicles moving across the stop line during red-phase are automatically captured.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK & RESULTS -->
+  <section id="results" class="section py-20 md:py-28">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid lg:grid-cols-[1.1fr,1fr] gap-10 items-start">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">05 — Tech Stack</p>
+          <h2 class="text-2xl md:text-3xl font-bold mb-4">
+            Built using YOLO, Python, and a lightweight web stack.
+          </h2>
+
+          <div class="grid sm:grid-cols-3 gap-4 text-xs mb-6">
+            <div class="neon-card rounded-2xl p-4 text-center" data-tilt data-tilt-max="8">
+              <div class="text-[0.7rem] text-slate-400 mb-1">Detection</div>
+              <div class="font-semibold mb-1">YOLO</div>
+              <div class="text-[0.75rem] text-slate-300">Real-time multi-object tracking.</div>
+            </div>
+            <div class="neon-card rounded-2xl p-4 text-center" data-tilt data-tilt-max="8">
+              <div class="text-[0.7rem] text-slate-400 mb-1">Backend</div>
+              <div class="font-semibold mb-1">Python & Flask</div>
+              <div class="text-[0.75rem] text-slate-300">Frame processing & API routing.</div>
+            </div>
+            <div class="neon-card rounded-2xl p-4 text-center" data-tilt data-tilt-max="8">
+              <div class="text-[0.7rem] text-slate-400 mb-1">Frontend</div>
+              <div class="font-semibold mb-1">HTML, JS</div>
+              <div class="text-[0.75rem] text-slate-300">Interactive dashboard UI.</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">06 — Results</p>
+          <div class="neon-card rounded-3xl p-[1px]">
+            <div class="glass-panel rounded-3xl p-5 sm:p-6 space-y-5">
+              <div class="grid grid-cols-2 gap-4 text-xs">
+                <div class="bg-slate-950/80 border border-slate-700/80 rounded-2xl px-3 py-3">
+                  <div class="text-slate-400 text-[0.65rem]">Overall Detection Accuracy</div>
+                  <div class="mt-1 text-lg font-bold text-neonGreen" data-counter data-target="96">0%</div>
+                </div>
+                <div class="bg-slate-950/80 border border-slate-700/80 rounded-2xl px-3 py-3">
+                  <div class="text-slate-400 text-[0.65rem]">Helmet Detection</div>
+                  <div class="mt-1 text-lg font-bold text-neonBlue" data-counter data-target="93">0%</div>
+                </div>
+                <div class="bg-slate-950/80 border border-slate-700/80 rounded-2xl px-3 py-3">
+                  <div class="text-slate-400 text-[0.65rem]">Wrong-Lane Precision</div>
+                  <div class="mt-1 text-lg font-bold text-neonPurple" data-counter data-target="91">0%</div>
+                </div>
+                <div class="bg-slate-950/80 border border-slate-700/80 rounded-2xl px-3 py-3">
+                  <div class="text-slate-400 text-[0.65rem]">Avg. Real-Time FPS</div>
+                  <div class="mt-1 text-lg font-bold text-neonBlue" data-counter data-target="28">0</div>
+                </div>
+              </div>
+
+              <p class="text-[0.8rem] text-slate-300">
+                Metrics calculated on representative junction footage with varied vehicle density and lighting conditions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Call-to-action -->
+      <div class="mt-10 flex flex-wrap gap-4 text-xs">
+        <button class="btn-neon bg-black/70">
+          <span>Download Full Report (PDF)</span>
+        </button>
+        <button class="btn-outline-neon bg-black/70">
+          View GitHub Source
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TEAM -->
+  <section id="team" class="section py-20 md:py-24 border-t border-slate-800/70">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <p class="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">07 — Project Team</p>
+      <h2 class="text-2xl md:text-3xl font-bold mb-6">
+        Built by a team that loves AI, traffic, and clean code.
+      </h2>
+
+      <!-- Change these names to your actual team -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 text-xs">
+        <div class="neon-card rounded-2xl p-4 flex flex-col gap-2" data-tilt data-tilt-max="10">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-neonBlue to-neonPurple flex items-center justify-center text-[0.7rem] font-bold">
+            AB
+          </div>
+          <div class="font-semibold text-sm">Abhinav</div>
+          <div class="text-[0.7rem] text-slate-400">Model Training & Pipeline</div>
+        </div>
+        <div class="neon-card rounded-2xl p-4 flex flex-col gap-2" data-tilt data-tilt-max="10">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-neonPurple to-neonRed flex items-center justify-center text-[0.7rem] font-bold">
+            TM
+          </div>
+          <div class="font-semibold text-sm">Teammate 1</div>
+          <div class="text-[0.7rem] text-slate-400">Backend & Flask APIs</div>
+        </div>
+        <div class="neon-card rounded-2xl p-4 flex flex-col gap-2" data-tilt data-tilt-max="10">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-neonBlue to-neonGreen flex items-center justify-center text-[0.7rem] font-bold">
+            TM
+          </div>
+          <div class="font-semibold text-sm">Teammate 2</div>
+          <div class="text-[0.7rem] text-slate-400">Frontend & Dashboard</div>
+        </div>
+        <div class="neon-card rounded-2xl p-4 flex flex-col gap-2" data-tilt data-tilt-max="10">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-neonRed to-neonPurple flex items-center justify-center text-[0.7rem] font-bold">
+            TM
+          </div>
+          <div class="font-semibold text-sm">Teammate 3</div>
+          <div class="text-[0.7rem] text-slate-400">Integration & Testing</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="section border-t border-slate-800/80 py-6 text-[0.7rem]">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-500">
+      <div>© <span class="text-slate-300">Smart Traffic AI Enforcement</span> — Project Showcase</div>
+      <div class="flex gap-4">
+        <span>Contact: yourmail@example.com</span>
+        <span class="hidden sm:inline">•</span>
+        <span>Version 1.0</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MAIN JS -->
+  <script>
+    // ===== Cursor glow follow =====
+    const glow = document.getElementById("cursor-glow");
+    window.addEventListener("pointermove", (e) => {
+      glow.style.left = e.clientX + "px";
+      glow.style.top = e.clientY + "px";
+    });
+
+    // ===== Three.js Hero Background =====
+    let scene, camera, renderer, grid, lights = [];
+    const canvas = document.getElementById("hero-canvas");
+
+    function initThree() {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(width, height);
+
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 200);
+      camera.position.set(0, 18, 32);
+      camera.lookAt(0, 0, 0);
+
+      // Grid floor
+      grid = new THREE.GridHelper(120, 80, 0x00E1FF, 0x111827);
+      grid.position.y = -6;
+      scene.add(grid);
+
+      // Soft fog
+      scene.fog = new THREE.FogExp2(0x020617, 0.03);
+
+      // Neon moving lights
+      const colors = [0x00E1FF, 0xAE00FF, 0xFF004D];
+      for (let i = 0; i < 3; i++) {
+        const light = new THREE.PointLight(colors[i], 2.5, 120, 2);
+        light.position.set(-40 + i * 40, 10 + i * 4, -10 + i * 6);
+        scene.add(light);
+        lights.push(light);
+      }
+
+      // Low ambient
+      const ambient = new THREE.AmbientLight(0x0f172a, 1.2);
+      scene.add(ambient);
+
+      animateThree();
+    }
+
+    function animateThree() {
+      requestAnimationFrame(animateThree);
+
+      const t = performance.now() * 0.0004;
+      grid.rotation.y = t * 0.6;
+
+      lights.forEach((light, i) => {
+        const offset = t + i * 0.8;
+        light.position.x = Math.sin(offset) * 35;
+        light.position.z = Math.cos(offset * 1.5) * 35;
+      });
+
+      camera.position.x = Math.sin(t * 0.4) * 18;
+      camera.position.z = 32 + Math.cos(t * 0.4) * 10;
+      camera.lookAt(0, 0, 0);
+
+      renderer.render(scene, camera);
+    }
+
+    function onResize() {
+      if (!renderer || !camera) return;
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    window.addEventListener("resize", onResize);
+
+    // Init Three after page load
+    window.addEventListener("load", () => {
+      initThree();
+    });
+
+    // ===== GSAP Scroll Animations =====
+    gsap.registerPlugin(ScrollTrigger);
+
+    gsap.utils.toArray("section.section").forEach((section, index) => {
+      gsap.from(section, {
+        opacity: 0,
+        y: 60,
+        duration: 1,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: section,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+    });
+
+    // hero title flicker
+    gsap.from(".glitch-text", {
+      opacity: 0,
+      y: 30,
+      duration: 1.2,
+      ease: "power3.out",
+      delay: 0.3,
+    });
+
+    // ===== Counter animations =====
+    const counters = document.querySelectorAll("[data-counter]");
+    const counterObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const el = entry.target;
+            const target = parseInt(el.getAttribute("data-target"), 10);
+            const isPercent = el.textContent.trim().endsWith("%");
+
+            let current = 0;
+            const duration = 1200;
+            const startTime = performance.now();
+
+            function updateCounter(now) {
+              const progress = Math.min((now - startTime) / duration, 1);
+              current = Math.floor(progress * target);
+              el.textContent = isPercent ? current + "%" : current;
+              if (progress < 1) requestAnimationFrame(updateCounter);
+            }
+
+            requestAnimationFrame(updateCounter);
+            counterObserver.unobserve(el);
+          }
+        });
+      },
+      { threshold: 0.4 }
+    );
+
+    counters.forEach((c) => counterObserver.observe(c));
+
+    // ===== Tilt initialization =====
+    window.addEventListener("load", () => {
+      if (window.VanillaTilt) {
+        VanillaTilt.init(document.querySelectorAll("[data-tilt]"), {
+          max: 10,
+          speed: 400,
+          glare: true,
+          "max-glare": 0.25,
+        });
+      }
+    });
+  </script>
+</body>
+</html>
